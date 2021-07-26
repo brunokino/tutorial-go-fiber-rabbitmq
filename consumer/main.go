@@ -1,11 +1,50 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
 	"os"
 
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 	"github.com/streadway/amqp"
 )
+
+func init() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("error loading .env file")
+	}
+}
+
+func Testabanco() {
+
+	type Produtos struct {
+		SKU  string
+		Name string
+	}
+
+	/* 	id := uuid.NewV4().String()
+	   	c.CreatedAt = time.Now()
+	*/
+
+	db := setupDb()
+	rows, err := db.Query("select sku, name from products")
+
+	for rows.Next() {
+		produtos := Produtos{}
+		err = rows.Scan(&produtos.SKU, &produtos.Name)
+		log.Println(produtos)
+	}
+
+	if err != nil {
+		log.Fatal(err)
+
+	}
+
+	defer rows.Close()
+}
 
 func main() {
 	// Define RabbitMQ server URL.
@@ -44,6 +83,8 @@ func main() {
 	log.Println("Successfully connected to RabbitMQ")
 	log.Println("Waiting for messages")
 
+	Testabanco()
+
 	// Make a channel to receive messages into infinite loop.
 	forever := make(chan bool)
 
@@ -55,4 +96,19 @@ func main() {
 	}()
 
 	<-forever
+}
+
+func setupDb() *sql.DB {
+	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		os.Getenv("host"),
+		os.Getenv("port"),
+		os.Getenv("user"),
+		os.Getenv("password"),
+		os.Getenv("dbname"),
+	)
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		log.Fatal("error connection to database")
+	}
+	return db
 }
